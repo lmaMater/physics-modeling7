@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кольца Ньютона</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/konva@8.2.2/konva.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #202124;
+            color: #fff;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .form-container {
+            width: 30%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        form {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        form label {
+            display: block;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        form input,
+        form button {
+            width: calc(100% - 10px);
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background-color: #444;
+            color: #fff;
+        }
+
+        button {
+            background-color: #007bff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.5s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #container {
+            width: 70%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="form-container">
+            <h1>Параметры</h1>
+            <form id="paramsForm">
+                <label for="radius">Радиус линзы (мм):</label>
+                <input type="number" step="0.01" min="0" id="radius" value="50">
+                <label for="n_lens">Показатель преломления линзы:</label>
+                <input type="number" step="0.01" min="0" id="n_lens" value="1.5">
+                <label for="n_plate">Показатель преломления пластины:</label>
+                <input type="number" step="0.01" min="0" id="n_plate" value="1.2">
+                <label for="n_env">Показатель преломления среды:</label>
+                <input type="number" step="0.01" min="0" id="n_env" value="1.0">
+                <label for="lambda">Длина волны (нм):</label>
+                <input type="number" step="0.01" min="0" id="lambda" value="500">
+                <button onclick="event.preventDefault(); calculate()">Рассчитать</button>
+            </form>
+        </div>
+        <div id="container"></div>
+    </div>
+
+<script>
+    const stageWidth = 800;
+    const stageHeight = 800;
+
+    const stage = new Konva.Stage({
+        container: 'container',
+        width: stageWidth,
+        height: stageHeight,
+    });
+
+    var layer = new Konva.Layer();
+
+    let ringGradient = '';
+    let circleGradient = '';
+
+    const setMaxGradient = () => {
+        ringGradient = [0, 'black', 0.5, 'red', 1, 'black'];
+        circleGradient = [0, 'red', 0.5, 'black', 1, 'red'];
+    };
+
+    const setMinGradient = () => {
+        ringGradient = [0, 'red', 0.5, 'black', 1, 'red'];
+        circleGradient = [0, 'black', 1, 'red'];
+    };
+
+    const drawRing = (innerRadius, outerRadius) => {
+        const ring = new Konva.Ring({
+            x: stageWidth / 2,
+            y: stageHeight / 2,
+            innerRadius: innerRadius,
+            outerRadius: outerRadius,
+            fillRadialGradientStartPoint: { x: 0, y: 0 },
+            fillRadialGradientStartRadius: innerRadius,
+            fillRadialGradientEndPoint: { x: 0, y: 0 },
+            fillRadialGradientEndRadius: outerRadius,
+            fillRadialGradientColorStops: ringGradient,
+        });
+
+        layer.add(ring);
+    };
+
+    const drawCircle = (radius) => {
+        var circle = new Konva.Circle({
+            x: stageWidth / 2,
+            y: stageHeight / 2,
+            radius: radius,
+            fillRadialGradientStartPoint: { x: 0, y: 0 },
+            fillRadialGradientStartRadius: 0,
+            fillRadialGradientEndPoint: { x: 0, y: 0 },
+            fillRadialGradientEndRadius: radius,
+            fillRadialGradientColorStops: circleGradient,
+        });
+
+        layer.add(circle);
+    };
+
+    const calculate = () => {
+        layer.removeChildren();
+
+        const lensRadius = parseFloat(document.getElementById("radius").value);
+        const lensRefractionIndex = parseFloat(document.getElementById("n_lens").value);
+        const plateRefractionIndex = parseFloat(document.getElementById("n_plate").value);
+        const environmentRefractionIndex = parseFloat(document.getElementById("n_env").value);
+        const waveLength = parseFloat(document.getElementById("lambda").value);
+
+        if (lensRadius <= 0 || waveLength <= 0 || lensRefractionIndex < 1 || plateRefractionIndex < 1 || environmentRefractionIndex < 1) {
+            alert("Введите корректные значения параметров!");
+            return;
+        }
+
+        if (lensRefractionIndex < environmentRefractionIndex && environmentRefractionIndex < plateRefractionIndex) {
+            setMaxGradient();
+        } else if (lensRefractionIndex >= environmentRefractionIndex && environmentRefractionIndex < plateRefractionIndex) {
+            setMinGradient();
+        } else if (lensRefractionIndex >= environmentRefractionIndex && environmentRefractionIndex >= plateRefractionIndex) {
+            alert("При заданных значениях кольца Ньютона не будет наблюдаться");
+            return;
+        } else {
+            setMinGradient();
+        }
+
+        const waveLengthInMeters = waveLength * 1e-9;
+        const scale = 20000;
+
+        const circleRadius = Math.sqrt(waveLengthInMeters * lensRadius * 0.5 / environmentRefractionIndex) * scale;
+        drawCircle(circleRadius);
+
+        for (let m = 1; m < 10; ++m) {
+            const innerRadius = Math.sqrt((m - 0.5) * waveLengthInMeters * lensRadius / environmentRefractionIndex);
+            const outerRadius = Math.sqrt((m + 0.5) * waveLengthInMeters * lensRadius / environmentRefractionIndex);
+            drawRing(innerRadius * scale, outerRadius * scale);
+        }
+
+        stage.add(layer);
+    };
+</script>
+
+
+</body>
+</html>
